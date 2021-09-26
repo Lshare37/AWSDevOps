@@ -1,0 +1,99 @@
+0. root 사용자로 로그인
+su - root
+
+1. Selinux 운영모드 상태확인 및 변경하기
+getenforce
+sed -i 's/enforcing$/permissive/g' /etc/selinux/config
+reboot
+
+2. 재부팅후 root로 접속하기
+su - root
+
+3. selinux상태를 재확인하기
+getenforce
+
+4. 방화벽 열기
+firewall-cmd --permanent --add-port=3690/tcp
+firewall-cmd --reload
+
+5. 설치자의 환경 프로파일 변경하기
+cat >> ~/.bash_profile << EOF
+SVN_EDITOR=/bin/vim
+export SVN_EDITOR
+EOF
+
+6. bash_profile 적용하기
+source ~/.bash_profile
+
+7. SVN 설치 ; yum 으로 설치를 진행 합니다.
+yum install subversion -y
+
+8. svn repo 디렉터리 생성하기
+mkdir -p /var/svn/repos
+
+9 . 저장소(Repository) 만들기
+svnadmin create --fs-type fsfs /var/svn/repos
+
+10. SVN 설정 파일 추가/수정
+# vim /var/svn/repos/conf/svnserve.conf
+# general 섹션에서 네 라인을 주석처리 해제와 익명사용자의 접근을 거부한다.
+[general]
+anon-access = none
+auth-access = write
+password-db = passwd
+authz-db = authz
+
+11. SVN 설정 파일 추가/수정
+# vim /var/svn/repos/conf/passwd
+# users 섹션에서 세 라인을 추가한다.
+svn = svn
+dev01 = dev01
+dev02 = dev02
+
+12. SVN 설정 파일 추가/수정
+vim /var/svn/repos/conf/authz
+# groups 섹션에서 라인을 추가한다.
+[groups]
+erp = dev01,dev02
+# 마지막 라인에 추가한다.
+[/]
+@erp = rw
+
+
+13. 데몬 파일 root 경로 확인하기
+cat /etc/sysconfig/svnserve | grep 'var'
+
+# 저장소의 위치를 변경하고 하는 경우 아래와 같이 수행한다.
+# 아래의 예제는 위치를 /svn 을 변경했을때 이다.
+sed -i 's/OPTIONS="-r \/var\/svn"/OPTIONS="-r \/svn"/g' /etc/sysconfig/svnserve
+
+14. SVN 시작 및 자동데몬 시작하게 하기
+systemctl enable --now svnserve
+
+
+15. SVN 기본 디렉토리 만들기
+#소스 코드를 관리하기 위해서는 trunk , branches, tags 를 만들어 줘야 합니다.
+svn mkdir -mf svn://192.168.108.3/repos/{trunk,branches,tags,src}
+
+‘root’의 암호: (root의 암호을 입력한다.)
+사용자명:dev01
+‘dev01’의 암호: dev01
+Store password unencrypted (yes/no)? no
+
+16. 아래의 파일에서 global섹션의 값을 변경한다.
+vim ~/.subversion/servers
+[global]
+# store-passwords = no
+# store-plaintext-passwords = no
+store-passwords = yes
+store-plaintext-passwords = yes
+
+
+17. SVN 시작 및 자동데몬 시작하게 하기
+systemctl restart svnserve
+
+18. 위에서 만든 디렉토리를 확인 합니다.
+svn list svn://192.168.108.3/repos
+
+19. 삭제해 보자
+svn delete -mf svn://192.168.108.3/repos/src 
